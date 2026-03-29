@@ -1,0 +1,126 @@
+# ==========================================
+# ÇEVRİM ANALİZİ BAŞLANGICI
+# ==========================================
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+file_path = r"C:\Users\pc\Desktop\proje\helios.txt"
+columns = ['YEAR', 'DOY', 'HR', 'Scalar_B', 'Bz_GSM', 'Proton_Density', 
+           'Plasma_Speed', 'Flow_Pressure', 'Kp_index', 'R_Sunspot', 
+           'Dst_index', 'ap_index', 'f10.7_index']
+
+try:
+    df = pd.read_csv(file_path, sep='\s+', names=columns, skiprows=2, on_bad_lines='skip')
+    df = df.apply(pd.to_numeric, errors='coerce')
+
+    df.loc[df['f10.7_index'] > 500, 'f10.7_index'] = np.nan
+    df.loc[df['R_Sunspot'] < 0, 'R_Sunspot'] = np.nan
+    
+    df.loc[df['Dst_index'] > 200, 'Dst_index'] = np.nan
+
+    df.replace([999.9, 9999.0, 999.0, 99.99, 99999.9], np.nan, inplace=True)
+
+    df = df.dropna(subset=['YEAR', 'DOY', 'HR'])
+    years = df['YEAR'].astype(int).astype(str)
+    days = df['DOY'].astype(int).astype(str).str.zfill(3)
+    df['Timestamp'] = pd.to_datetime(years + days, format='%Y%j') + pd.to_timedelta(df['HR'].astype(int), unit='h')
+    df.set_index('Timestamp', inplace=True)
+
+    df_monthly = df.resample('M').mean()
+
+    fig, axes = plt.subplots(nrows=5, ncols=2, figsize=(16, 22))
+    fig.suptitle('25. Güneş Döngüsü: TEMİZLENMİŞ PARAMETRE ANALİZİ', fontsize=22, fontweight='bold')
+
+    params = [
+        ('f10.7_index', 'F10.7 (sfu)', 'olive'), ('R_Sunspot', 'Güneş Lekesi Sayısı', 'black'),
+        ('Scalar_B', 'B-Total (nT)', 'blue'), ('Bz_GSM', 'Bz GSM (nT)', 'red'),
+        ('Proton_Density', 'Proton Yoğunluğu', 'green'), ('Plasma_Speed', 'Hız (km/s)', 'orange'),
+        ('Flow_Pressure', 'Basınç (nPa)', 'purple'), ('Dst_index', 'Dst (nT)', 'magenta'),
+        ('Kp_index', 'Kp (x10)', 'brown'), ('ap_index', 'ap İndeksi', 'cyan')
+    ]
+
+    for i, (col, label, color) in enumerate(params):
+        ax = axes[i // 2, i % 2]
+        ax.plot(df.index, df[col], color=color, linewidth=0.5, alpha=0.2)
+        ax.plot(df_monthly.index, df_monthly[col], color=color, linewidth=2.5, label='Aylık Trend')
+        ax.set_ylabel(label, fontsize=12, fontweight='bold')
+        ax.grid(True, alpha=0.3)
+        if i == 0: ax.legend()
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.96])
+    plt.show()
+
+    print(f"Başarı: {df.index.min().year} - {df.index.max().year} arası veri işlendi.")
+
+except Exception as e:
+    print(f"HATA: {e}")
+
+# ==========================================
+# ÇIKTI
+# ==========================================
+
+import matplotlib.pyplot as plt
+
+df_monthly = df.resample('M').mean()
+top_5_months = df_monthly.sort_values(by='ap_index', ascending=False).head(5).copy()
+top_5_months['Tarih'] = top_5_months.index.strftime('%Y-%m')
+
+display_df = top_5_months[['Tarih', 'ap_index', 'R_Sunspot']].copy()
+display_df.columns = ['Fırtına Tarihi', 'ap Şiddeti', 'Leke Sayısı']
+
+
+fig, ax = plt.subplots(figsize=(12, 4))
+ax.axis('tight')
+ax.axis('off')
+
+the_table = ax.table(cellText=display_df.values, 
+                     colLabels=display_df.columns, 
+                     cellLoc='center', 
+                     loc='center',
+                     colColours=["#d1e7dd"] * 4)
+
+
+the_table.auto_set_font_size(False)
+the_table.set_fontsize(13)
+the_table.scale(1.2, 2.8)
+
+plt.title('25. Güneş Döngüsü: En Yüksek Jeomanyetik Aktivite Gösteren 5 Ay', 
+          fontsize=16, fontweight='bold', pad=30, color='darkred')
+
+plt.show()
+# ==========================================
+# ÇIKTI
+# ==========================================
+
+import matplotlib.pyplot as plt
+
+
+df_yearly_clean = df_yearly.copy()
+base_val = df_yearly_clean.loc[2019]
+df_table = ((df_yearly_clean - base_val) / base_val * 100).round(2)
+
+
+display_cols = ['ap_index', 'R_Sunspot']
+table_data = df_table[display_cols].reset_index()
+table_data.columns = ['Yıl', 'ap Artış (%)', 'Leke Sayısı Artış (%)']
+
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.axis('tight')
+ax.axis('off')
+
+the_table = ax.table(cellText=table_data.values, 
+                     colLabels=table_data.columns, 
+                     cellLoc='center', 
+                     loc='center',
+                     colColours=["#f2f2f2"] * 4)
+
+
+the_table.auto_set_font_size(False)
+the_table.set_fontsize(12)
+the_table.scale(1.2, 2.5) 
+
+plt.title('\n \n 25. Güneş Döngüsü Parametrik Artış Analizi', 
+          fontsize=16, fontweight='bold', pad=10)
+
+plt.show()
